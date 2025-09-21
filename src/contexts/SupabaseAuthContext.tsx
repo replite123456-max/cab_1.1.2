@@ -7,7 +7,7 @@ interface SupabaseAuthContextType {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<{ success: boolean; error?: string }>;
   resetUserPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
-  updateUserPassword: (newPassword: string, accessToken?: string) => Promise<{ success: boolean; error?: string }>;
+  updateUserPassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   isAdmin: () => boolean;
 }
 
@@ -81,8 +81,8 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return await resetPassword(email);
   };
 
-  const updateUserPassword = async (newPassword: string, accessToken?: string) => {
-    return await updatePassword(newPassword, accessToken);
+  const updateUserPassword = async (newPassword: string) => {
+    return await updatePassword(newPassword);
   };
 
   const isAdmin = () => {
