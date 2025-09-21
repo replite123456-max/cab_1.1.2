@@ -1,107 +1,81 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { signInAdmin, signOutAdmin, getCurrentAdmin, resetPassword, updatePassword, onAuthStateChange, AdminUser } from '../lib/supabaseAuth';
+// src/lib/supabaseAuth.ts
 
-interface SupabaseAuthContextType {
-  user: AdminUser | null;
-  isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signOut: () => Promise<{ success: boolean; error?: string }>;
-  resetUserPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
-  updateUserPassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
-  isAdmin: () => boolean;
-}
+import { supabase } from './supabase'; // Your Supabase client instance
+import { AdminUser } from './types'; // Assuming you have a type definition
 
-const SupabaseAuthContext = createContext<SupabaseAuthContextType | undefined>(undefined);
-
-export const useSupabaseAuth = () => {
-  const context = useContext(SupabaseAuthContext);
-  if (!context) {
-    throw new Error('useSupabaseAuth must be used within a SupabaseAuthProvider');
-  }
-  return context;
-};
-
-export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AdminUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check for existing session on mount
-    const checkUser = async () => {
-      try {
-        const { user: currentUser } = await getCurrentAdmin();
-        setUser(currentUser);
-      } catch (error) {
-        console.error('Error checking current user:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkUser();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = onAuthStateChange((user) => {
-      setUser(user);
-      setIsLoading(false);
+// --- Sign In ---
+export const signInAdmin = async (email: string, password: string) => {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, []);
-
-  const signIn = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const result = await signInAdmin(email, password);
-      if (result.success && result.user) {
-        setUser(result.user);
-      }
-      return result;
-    } finally {
-      setIsLoading(false);
+    if (error) {
+      return { success: false, error: error.message };
     }
-  };
 
-  const signOut = async () => {
-    setIsLoading(true);
-    try {
-      const result = await signOutAdmin();
-      if (result.success) {
-        setUser(null);
-      }
-      return result;
-    } finally {
-      setIsLoading(false);
+    return { success: true, user: data.user };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'An unexpected error occurred.' };
+  }
+};
+
+// --- Sign Out ---
+export const signOutAdmin = async () => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      return { success: false, error: error.message };
     }
-  };
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'An unexpected error occurred.' };
+  }
+};
 
-  const resetUserPassword = async (email: string) => {
-    return await resetPassword(email);
-  };
+// --- Get Current User ---
+export const getCurrentAdmin = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  return { user: user as AdminUser | null };
+};
 
-  const updateUserPassword = async (newPassword: string) => {
-    return await updatePassword(newPassword);
-  };
+// --- Password Reset Request (FIXED) ---
+export const resetPassword = async (email: string) => {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // ✅ This is the crucial fix.
+      redirectTo: 'http://localhost:3000/admin/reset-password',
+    });
 
-  const isAdmin = () => {
-    return user?.role === 'admin';
-  };
+    if (error) {
+      return { success: false, error: error.message };
+    }
 
-  return (
-    <SupabaseAuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        signIn,
-        signOut,
-        resetUserPassword,
-        updateUserPassword,
-        isAdmin,
-      }}
-    >
-      {children}
-    </SupabaseAuthContext.Provider>
-  );
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'An unexpected error occurred.' };
+  }
+};
+
+// --- Password Update ---
+export const updatePassword = async (newPassword: string) => {
+  try {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, user: data.user };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'An unexpected error occurred.' };
+  }
+};
+
+// --- Auth State Change Listener ---
+export const onAuthStateChange = (callback: (user: AdminUser | null) => void) => {
+  return supabase.auth.onAuthStateChange((event, session) => {
+    callback(session?.user as AdminUser | null);
+  });
 };
