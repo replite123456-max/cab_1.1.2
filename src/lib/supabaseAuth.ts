@@ -106,7 +106,7 @@ export const getCurrentAdmin = async (): Promise<{ user: AdminUser | null; error
 export const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/admin/reset-password`,
+      redirectTo: `${window.location.origin}/admin/reset-password`
     });
 
     if (error) {
@@ -120,8 +120,20 @@ export const resetPassword = async (email: string): Promise<{ success: boolean; 
 };
 
 // Update password
-export const updatePassword = async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
+export const updatePassword = async (newPassword: string, accessToken?: string): Promise<{ success: boolean; error?: string }> => {
   try {
+    // If access token is provided (from reset link), set the session first
+    if (accessToken) {
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: '', // Not needed for password reset
+      });
+      
+      if (sessionError) {
+        return { success: false, error: sessionError.message };
+      }
+    }
+
     const { error } = await supabase.auth.updateUser({
       password: newPassword,
     });

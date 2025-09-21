@@ -21,7 +21,7 @@ const AdminForgotPassword: React.FC = () => {
       
       if (result.success) {
         setIsEmailSent(true);
-        toast.success('Password reset email sent! Check your inbox.');
+        toast.success('Password reset email sent! Check your inbox and click the reset link.');
       } else {
         toast.error(result.error || 'Failed to send reset email');
       }

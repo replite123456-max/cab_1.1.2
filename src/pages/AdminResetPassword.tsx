@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const AdminResetPassword: React.FC = () => {
@@ -17,17 +17,35 @@ const AdminResetPassword: React.FC = () => {
 
   const { updateUserPassword } = useSupabaseAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  const accessToken = searchParams.get('access_token');
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isValidating, setIsValidating] = useState(true);
 
   useEffect(() => {
-    // Only check for access_token
-    if (!accessToken) {
-      toast.error('Invalid reset link. Please request a new password reset.');
+    // Extract access token from URL hash (Supabase sends it in the hash, not query params)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const token = hashParams.get('access_token');
+    const type = hashParams.get('type');
+    
+    if (type === 'recovery' && token) {
+      setAccessToken(token);
+      setIsValidating(false);
+    } else {
+      toast.error('Invalid or expired reset link. Please request a new password reset.');
       navigate('/admin/forgot-password');
     }
-  }, [accessToken, navigate]);
+  }, [navigate]);
+
+  // Show loading while validating token
+  if (isValidating) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center py-12 px-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white">Validating reset link...</p>
+        </div>
+      </div>
+    );
+  }
 
   const validatePassword = (password: string) => {
     if (password.length < 8) return 'Password must be at least 8 characters long';
@@ -54,7 +72,10 @@ const AdminResetPassword: React.FC = () => {
     setIsLoading(true);
 
     try {
-      if (!accessToken) throw new Error('Access token missing');
+      if (!accessToken) {
+        toast.error('Invalid reset session. Please try again.');
+        return;
+      }
 
       const result = await updateUserPassword(formData.password, accessToken);
 
